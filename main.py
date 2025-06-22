@@ -30,4 +30,5 @@ def main():
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
 
-main()
+if __name__ == "__main__":
+    main()
