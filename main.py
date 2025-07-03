@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-from available_functions import available_functions
+from available_functions import available_functions, function_map
 from system_prompt import system_prompt
 
 
@@ -46,7 +46,43 @@ def generate_content(client, model, messages, user_prompt, verbose):
         return response.text
     
     for function_call_part in response.function_calls:
-        print(f"Calling function: {function_call_part.name}({function_call_part.args})")  
+        function_call_result = call_function(function_call_part)
+        if not function_call_result.parts[0].function_response.response:
+            raise Exception("Error while trying to call the function:", function_call_part.name)
+        if verbose:
+            print(f"-> {function_call_result.parts[0].function_response.response}")
+
+
+def call_function(function_call_part, verbose=False):
+    if verbose:
+        print(f"Calling function: {function_call_part.name}({function_call_part.args})")
+    else:
+        print(f" - Calling function: {function_call_part.name}")
+
+    function_call_part.args["working_directory"] = "./calculator"
+
+    try:
+        function_result = function_map[function_call_part.name](**function_call_part.args)
+    except NameError:
+        return types.Content(
+            role="tool",
+            parts=[
+                types.Part.from_function_response(
+                    name=function_call_part.name,
+                    response={"error": f"Unknown function: {function_call_part.name}"},
+                )
+            ],
+        )
+
+    return types.Content(
+        role="tool",
+        parts=[
+            types.Part.from_function_response(
+                name=function_call_part.name,
+                response={"result": function_result},
+            )
+        ],
+    )
 
 
 if __name__ == "__main__":
